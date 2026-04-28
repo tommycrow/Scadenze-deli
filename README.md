@@ -1,2 +1,2 @@
 # Scadenze-deli
-Gestione Scadesne prodotti freschi
+Gestione Scadenze prodotti freschi
