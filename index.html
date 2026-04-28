@@ -1,1016 +1,1190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<meta name="theme-color" content="#0f1117"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Scadenze Deli"/>
+<meta name="description" content="Gestione scadenze prodotti per negozi retail e deli"/>
+<title>Scadenze Deli</title>
 
-import { useState, useEffect, useRef, useMemo } from "react";
+<!-- PWA Manifest inline via JS -->
+<link rel="manifest" href="#" id="manifest-placeholder"/>
 
-// ─── PALETTE & THEME ────────────────────────────────────────────────
-const COLORS = {
-  bg: "#0f1117",
-  surface: "#1a1d27",
-  card: "#21253a",
-  border: "#2e3350",
-  accent: "#f97316",
-  accentDark: "#c2570a",
-  green: "#22c55e",
-  yellow: "#eab308",
-  red: "#ef4444",
-  text: "#f1f5f9",
-  muted: "#64748b",
-  subtle: "#334155",
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --card: #20243a;
+  --border: #2a2f4a;
+  --accent: #f97316;
+  --accent2: #fb923c;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #ef4444;
+  --text: #f1f5f9;
+  --muted: #64748b;
+  --subtle: #1e2235;
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* HEADER */
+#header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  backdrop-filter: blur(10px);
+}
+#header .logo { display: flex; align-items: center; gap: 10px; }
+#header .logo-icon {
+  width: 38px; height: 38px; background: var(--accent);
+  border-radius: 10px; display: flex; align-items: center;
+  justify-content: center; font-size: 20px;
+}
+#header .logo-text { font-weight: 800; font-size: 15px; }
+#header .logo-sub { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+/* MAIN */
+#main { padding: 74px 16px 90px; max-width: 900px; margin: 0 auto; }
+
+/* BOTTOM NAV */
+#bottomnav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; justify-content: space-around;
+  padding: 8px 0 max(12px, env(safe-area-inset-bottom));
+}
+.nav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  padding: 4px 16px; transition: color .2s; min-width: 60px;
+}
+.nav-btn.active { color: var(--accent); }
+.nav-btn svg { width: 22px; height: 22px; }
+.nav-btn span { font-size: 10px; font-weight: 600; font-family: 'DM Sans'; }
+
+/* CARDS */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; margin-bottom: 12px;
+}
+.card-title {
+  font-size: 11px; color: var(--accent); font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px;
+}
+
+/* STAT GRID */
+.stat-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 16px; }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; text-align: center;
+}
+.stat-num { font-size: 36px; font-weight: 800; font-family: 'DM Mono'; }
+.stat-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 600; }
+
+/* BADGE */
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; font-family: 'DM Mono'; letter-spacing: 1px;
+}
+.badge-red { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.badge-yellow { background: rgba(234,179,8,.15); color: var(--yellow); border: 1px solid rgba(234,179,8,.3); }
+.badge-green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+
+/* PRODUCT ROW */
+.prod-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+  cursor: pointer; transition: all .15s; gap: 10px;
+}
+.prod-row:active { opacity: .8; }
+.prod-stripe { width: 4px; height: 40px; border-radius: 4px; flex-shrink: 0; }
+.prod-name { font-weight: 700; font-size: 14px; }
+.prod-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.prod-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; border: none;
+  border-radius: var(--radius-sm); padding: 9px 18px; font-size: 13px;
+  font-weight: 700; cursor: pointer; transition: all .15s;
+  font-family: 'DM Sans'; white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+.btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.btn-ghost { background: transparent; color: var(--muted); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-icon { padding: 7px; border-radius: 8px; }
+
+/* FORM */
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.form-label .req { color: var(--accent); }
+.form-input, .form-select, .form-textarea {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  color: var(--text); font-size: 14px; font-family: 'DM Sans';
+  outline: none; transition: border-color .2s; width: 100%;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-textarea { resize: vertical; min-height: 70px; }
+.form-grid { display: grid; gap: 12px; }
+.form-grid-2 { grid-template-columns: 1fr 1fr; }
+.form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-section { margin-bottom: 20px; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  z-index: 500; display: flex; align-items: flex-end;
+  padding: 0;
+}
+.modal-overlay.center { align-items: center; padding: 16px; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0; width: 100%; max-height: 92vh;
+  overflow-y: auto; padding: 20px 16px 30px;
+  animation: slideUp .3s ease;
+}
+.modal-overlay.center .modal-box { border-radius: 16px; max-width: 560px; animation: fadeIn .2s ease; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.modal-title { font-size: 17px; font-weight: 800; }
+
+/* TABS */
+.tabs { display: flex; gap: 6px; background: var(--subtle); padding: 5px; border-radius: 10px; margin-bottom: 18px; }
+.tab-btn {
+  flex: 1; padding: 8px; border: none; border-radius: 8px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  background: transparent; color: var(--muted); font-family: 'DM Sans';
+  transition: all .2s;
+}
+.tab-btn.active { background: var(--accent); color: #fff; }
+
+/* SEARCH */
+.search-wrap { position: relative; margin-bottom: 12px; }
+.search-wrap input { padding-left: 38px; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+/* FILTER ROW */
+.filter-row { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+.filter-row select, .filter-row .form-select { min-width: 130px; font-size: 12px; padding: 8px 10px; }
+
+/* TOAST */
+#toast {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-80px);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 30px; padding: 10px 20px; font-size: 13px; font-weight: 700;
+  z-index: 1000; transition: transform .3s ease; white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* DETAIL ROW */
+.detail-row {
+  display: flex; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--border); align-items: flex-start;
+}
+.detail-lbl { font-size: 12px; color: var(--muted); font-weight: 600; min-width: 140px; flex-shrink: 0; }
+.detail-val { font-size: 13px; color: var(--text); }
+
+/* CHIP */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 12px; font-size: 12px; margin: 3px;
+}
+.chip-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; line-height: 1; padding: 0; }
+
+/* INSTALL BANNER */
+#install-banner {
+  display: none; position: fixed; bottom: 78px; left: 16px; right: 16px;
+  background: linear-gradient(135deg, var(--accent), #f59e0b);
+  border-radius: var(--radius); padding: 14px 16px; z-index: 300;
+  box-shadow: 0 8px 32px rgba(249,115,22,.4);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{box-shadow:0 8px 32px rgba(249,115,22,.4)} 50%{box-shadow:0 8px 40px rgba(249,115,22,.7)} }
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.install-banner-content { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.install-text { font-weight: 700; font-size: 13px; color: #fff; }
+.install-sub { font-size: 11px; color: rgba(255,255,255,.8); margin-top: 2px; }
+
+/* URGENT ROW */
+.urgent-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; border-radius: 10px; margin-bottom: 8px;
+  cursor: pointer; transition: all .15s; gap: 10px;
+}
+
+/* SELECT option */
+select option { background: #1a1d27; color: var(--text); }
+
+/* Safe area */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  #bottomnav { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}
+
+@media (min-width: 600px) {
+  .stat-grid { grid-template-columns: repeat(4,1fr); }
+  .form-grid-2 { grid-template-columns: 1fr 1fr; }
+}
+
+input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); opacity:.6; }
+input[type=time]::-webkit-calendar-picker-indicator { filter: invert(1); opacity:.6; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo">
+    <div class="logo-icon">🏪</div>
+    <div>
+      <div class="logo-text" id="shop-name-display">Deli Manager</div>
+      <div class="logo-sub">Gestione Scadenze</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="header-badge" style="display:none;background:rgba(239,68,68,.2);color:var(--red);border:1px solid rgba(239,68,68,.4);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700"></span>
+    <button class="btn btn-primary btn-sm" onclick="openForm()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      Nuovo
+    </button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="page-dashboard"></div>
+  <div id="page-products" style="display:none"></div>
+  <div id="page-reports" style="display:none"></div>
+  <div id="page-settings" style="display:none"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div id="bottomnav">
+  <button class="nav-btn active" data-page="dashboard" onclick="navigate('dashboard')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Home</span>
+  </button>
+  <button class="nav-btn" data-page="products" onclick="navigate('products')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    <span>Prodotti</span>
+  </button>
+  <button class="nav-btn" data-page="reports" onclick="navigate('reports')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span>Report</span>
+  </button>
+  <button class="nav-btn" data-page="settings" onclick="navigate('settings')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>Impost.</span>
+  </button>
+</div>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner">
+  <div class="install-banner-content">
+    <div>
+      <div class="install-text">📲 Installa l'app sul tuo telefono!</div>
+      <div class="install-sub">Accedi offline in qualsiasi momento</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.25);color:#fff;border:1px solid rgba(255,255,255,.4)" onclick="installApp()">Installa</button>
+      <button class="btn btn-sm btn-icon" style="background:rgba(0,0,0,.2);color:#fff;border:none" onclick="document.getElementById('install-banner').style.display='none'">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">✅ Salvato!</div>
+
+<!-- MODALS placeholder -->
+<div id="modal-container"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA & STORAGE
+// ═══════════════════════════════════════════════════════
+const S = {
+  get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
 
-// ─── INITIAL DATA ───────────────────────────────────────────────────
-const DEFAULT_CATEGORIES = {
-  settori: ["Gastronomia", "Latticini", "Bevande", "Surgelati", "Panetteria", "Macelleria", "Pescheria"],
+const DEF_CATEGORIES = {
+  settori: ['Gastronomia','Latticini','Bevande','Surgelati','Panetteria','Macelleria','Pescheria'],
   famiglie: {
-    Gastronomia: ["Salumi", "Pasta pronta", "Insalate"],
-    Latticini: ["Formaggi", "Yogurt", "Burro", "Panna"],
-    Bevande: ["Succhi", "Acqua", "Birra", "Vino"],
-    Surgelati: ["Verdure", "Pesce", "Carne", "Pizze"],
-    Panetteria: ["Pane", "Paste", "Biscotti"],
-    Macelleria: ["Bovino", "Suino", "Pollame"],
-    Pescheria: ["Pesce fresco", "Molluschi", "Crostacei"],
+    Gastronomia:['Salumi','Pasta pronta','Insalate'],
+    Latticini:['Formaggi','Yogurt','Burro','Panna'],
+    Bevande:['Succhi','Acqua','Birra','Vino'],
+    Surgelati:['Verdure','Pesce','Carne','Pizze'],
+    Panetteria:['Pane','Paste','Biscotti'],
+    Macelleria:['Bovino','Suino','Pollame'],
+    Pescheria:['Pesce fresco','Molluschi','Crostacei']
   },
   sottofamiglie: {
-    Salumi: ["Prosciutto crudo", "Prosciutto cotto", "Salame", "Mortadella"],
-    Formaggi: ["Freschi", "Stagionati", "Semistagionati", "Fusi"],
-    Yogurt: ["Bianco", "Alla frutta", "Greco"],
-    Succhi: ["Arancia", "Mela", "Pesca", "Multivitamina"],
-    Pane: ["Bianco", "Integrale", "Speciale"],
-  },
+    Salumi:['Prosciutto crudo','Prosciutto cotto','Salame','Mortadella'],
+    Formaggi:['Freschi','Stagionati','Semistagionati','Fusi'],
+    Yogurt:['Bianco','Alla frutta','Greco'],
+    Pane:['Bianco','Integrale','Speciale']
+  }
 };
-
-const DEFAULT_ALERTS = [
-  { id: "a1", giorni: 7, ora: "08:00", attivo: true, label: "1 settimana prima" },
-  { id: "a2", giorni: 3, ora: "08:00", attivo: true, label: "3 giorni prima" },
-  { id: "a3", giorni: 1, ora: "08:00", attivo: true, label: "1 giorno prima" },
-  { id: "a4", giorni: 0, ora: "08:00", attivo: true, label: "Giorno stesso" },
+const DEF_ALERTS = [
+  {id:'a1',giorni:7,ora:'08:00',attivo:true,label:'1 settimana prima'},
+  {id:'a2',giorni:3,ora:'08:00',attivo:true,label:'3 giorni prima'},
+  {id:'a3',giorni:1,ora:'08:00',attivo:true,label:'1 giorno prima'},
+  {id:'a4',giorni:0,ora:'08:00',attivo:true,label:'Giorno stesso'}
 ];
 
-// ─── STORAGE ─────────────────────────────────────────────────────────
-const store = {
-  get: (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-};
+let products = S.get('products', []);
+let categories = S.get('categories', DEF_CATEGORIES);
+let alerts = S.get('alerts', DEF_ALERTS);
+let shopName = S.get('shopName', 'Deli Manager');
+let currentPage = 'dashboard';
+let editingId = null;
 
-// ─── AUDIO ALERT ─────────────────────────────────────────────────────
-function playAlert(volume = 0.7) {
+function save() { S.set('products',products); }
+function saveAlerts() { S.set('alerts',alerts); }
+function saveCategories() { S.set('categories',categories); }
+function saveShop() { S.set('shopName',shopName); }
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function uuid() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function daysLeft(d) { if(!d) return 9999; return Math.ceil((new Date(d)-new Date(todayStr()))/86400000); }
+function fmtDate(d) { if(!d) return '—'; const [y,m,g]=d.split('-'); return `${g}/${m}/${y}`; }
+function statusColor(days) { if(days<0) return '#ef4444'; if(days<=3) return '#eab308'; return '#22c55e'; }
+function statusLabel(days) { if(days<0) return 'SCADUTO'; if(days===0) return 'SCADE OGGI'; if(days===1) return 'DOMANI'; return days+' giorni'; }
+function badgeClass(days) { if(days<0) return 'badge-red'; if(days<=3) return 'badge-yellow'; return 'badge-green'; }
+function badge(days) { return `<span class="badge ${badgeClass(days)}">${statusLabel(days)}</span>`; }
+function emptyProd() {
+  return {id:uuid(),nomeProdotto:'',codiceABarre:'',qrCode:'',codiceSKU:'',descrizione:'',
+    settore:'',famiglia:'',sottofamiglia:'',dataProduzione:'',dataScadenza:'',
+    dataApertura:'',giorniVitaDopoApertura:'',fornitore:'',numeroFattura:'',
+    dataFattura:'',numeroLotto:'',quantitaRicevuta:'',unitaMisura:'pz',prezzoUnitario:'',
+    posizioneInterna:'',quantitaAttuale:'',quantitaMinima:'',note:'',
+    dataInserimento:todayStr(),ultimaModifica:todayStr()};
+}
+
+// ═══════════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════════
+function playAlert(vol=0.6) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99, 1046.50];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.15);
-      gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + i * 0.15 + 0.05);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.15 + 0.25);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+    const ctx = new(window.AudioContext||window.webkitAudioContext)();
+    [[523.25,0],[659.25,.15],[783.99,.3],[1046.5,.45]].forEach(([f,t])=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value=f; o.type='sine';
+      g.gain.setValueAtTime(0,ctx.currentTime+t);
+      g.gain.linearRampToValueAtTime(vol,ctx.currentTime+t+.05);
+      g.gain.linearRampToValueAtTime(0,ctx.currentTime+t+.25);
+      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.3);
     });
-  } catch {}
+  } catch(e){}
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────────
-function uuid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2); }
-function today() { return new Date().toISOString().split("T")[0]; }
-function daysLeft(date) {
-  const diff = new Date(date) - new Date(today());
-  return Math.ceil(diff / 86400000);
-}
-function statusColor(days) {
-  if (days < 0) return COLORS.red;
-  if (days <= 3) return COLORS.yellow;
-  return COLORS.green;
-}
-function statusLabel(days) {
-  if (days < 0) return "SCADUTO";
-  if (days === 0) return "SCADE OGGI";
-  if (days === 1) return "SCADE DOMANI";
-  return `${days} giorni`;
-}
-function formatDate(d) {
-  if (!d) return "—";
-  const [y, m, g] = d.split("-");
-  return `${g}/${m}/${y}`;
+// ═══════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2800);
 }
 
-// ─── EMPTY PRODUCT ────────────────────────────────────────────────────
-function emptyProduct() {
-  return {
-    id: uuid(), nomeProdotto: "", codiceABarre: "", qrCode: "", codiceSKU: "",
-    descrizione: "", settore: "", famiglia: "", sottofamiglia: "",
-    dataProduzione: "", dataScadenza: "", dataApertura: "", giorniVitaDopoApertura: "",
-    fornitore: "", numeroFattura: "", dataFattura: "", numeroLotto: "",
-    quantitaRicevuta: "", unitaMisura: "pz", prezzoUnitario: "",
-    posizioneInterna: "", quantitaAttuale: "", quantitaMinima: "", note: "",
-    dataInserimento: today(), ultimaModifica: today(),
-  };
+// ═══════════════════════════════════════════════════════
+// NAVIGATE
+// ═══════════════════════════════════════════════════════
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('#page-dashboard,#page-products,#page-reports,#page-settings').forEach(el=>el.style.display='none');
+  document.getElementById('page-'+page).style.display='block';
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  renderPage(page);
+  updateHeaderBadge();
 }
 
-// ─── ICON COMPONENTS ──────────────────────────────────────────────────
-const Icon = ({ d, size = 20, color = "currentColor", ...p }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d={d} />
-  </svg>
-);
-const Icons = {
-  Home: () => <Icon d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10" />,
-  List: () => <Icon d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
-  Plus: () => <Icon d="M12 5v14M5 12h14" />,
-  Edit: () => <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />,
-  Trash: () => <Icon d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />,
-  Bell: () => <Icon d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />,
-  Settings: () => <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />,
-  Chart: () => <Icon d="M18 20V10M12 20V4M6 20v-6" />,
-  Search: () => <Icon d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0" />,
-  X: () => <Icon d="M18 6L6 18M6 6l12 12" />,
-  Check: () => <Icon d="M20 6L9 17l-5-5" />,
-  Scan: () => <Icon d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />,
-  Download: () => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />,
-  Package: () => <Icon d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" />,
-  AlertTriangle: () => <Icon d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />,
-  Copy: () => <Icon d="M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />,
-};
-
-// ─── BADGE ────────────────────────────────────────────────────────────
-function Badge({ days }) {
-  const col = statusColor(days);
-  const lbl = statusLabel(days);
-  return (
-    <span style={{
-      background: col + "22", color: col, border: `1px solid ${col}55`,
-      borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700,
-      letterSpacing: 1, fontFamily: "monospace",
-    }}>{lbl}</span>
-  );
+function updateHeaderBadge() {
+  const b = document.getElementById('header-badge');
+  const n = products.filter(p=>daysLeft(p.dataScadenza)<0).length;
+  if(n>0){b.textContent=n+' scaduti';b.style.display='inline';}else{b.style.display='none';}
+  document.getElementById('shop-name-display').textContent = shopName;
 }
 
-// ─── INPUT ────────────────────────────────────────────────────────────
-function Input({ label, value, onChange, type = "text", required, placeholder, style, ...p }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, ...style }}>
-      {label && <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{label}{required && <span style={{ color: COLORS.accent }}> *</span>}</label>}
-      <input
-        type={type} value={value || ""} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8,
-          padding: "9px 12px", color: COLORS.text, fontSize: 14, outline: "none",
-          transition: "border-color .2s",
-        }}
-        onFocus={e => e.target.style.borderColor = COLORS.accent}
-        onBlur={e => e.target.style.borderColor = COLORS.border}
-        {...p}
-      />
+function renderPage(page) {
+  if(page==='dashboard') renderDashboard();
+  if(page==='products') renderProducts();
+  if(page==='reports') renderReports();
+  if(page==='settings') renderSettings();
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════
+function renderDashboard() {
+  const el = document.getElementById('page-dashboard');
+  const scaduti = products.filter(p=>daysLeft(p.dataScadenza)<0).length;
+  const oggi = products.filter(p=>daysLeft(p.dataScadenza)===0).length;
+  const settimana = products.filter(p=>{const d=daysLeft(p.dataScadenza);return d>0&&d<=7;}).length;
+  const urgent = [...products].filter(p=>daysLeft(p.dataScadenza)<=7).sort((a,b)=>daysLeft(a.dataScadenza)-daysLeft(b.dataScadenza));
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div>
+        <h1 style="font-size:22px;font-weight:800">Dashboard</h1>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}</div>
+      </div>
     </div>
-  );
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num" style="color:var(--text)">${products.length}</div><div class="stat-lbl">Prodotti Totali</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--red)">${scaduti}</div><div class="stat-lbl">Scaduti</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--yellow)">${oggi}</div><div class="stat-lbl">Scadono Oggi</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent)">${settimana}</div><div class="stat-lbl">Entro 7 Giorni</div></div>
+    </div>
+    ${urgent.length>0 ? `
+    <div class="card">
+      <div class="card-title">⚠️ Prodotti Urgenti</div>
+      ${urgent.map(p=>{
+        const d=daysLeft(p.dataScadenza), col=statusColor(d);
+        return `<div class="urgent-row" style="background:${col}11;border:1px solid ${col}33" onclick="openDetail('${p.id}')">
+          <div>
+            <div style="font-weight:700;font-size:14px">${p.nomeProdotto}</div>
+            <div style="font-size:11px;color:var(--muted)">${p.fornitore||'—'} · ${p.settore||'—'}</div>
+          </div>
+          ${badge(d)}
+        </div>`;
+      }).join('')}
+    </div>` : `
+    <div class="card" style="text-align:center;padding:40px 20px">
+      <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <div style="font-weight:700;font-size:16px">Nessuna urgenza!</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:6px">Tutti i prodotti hanno scadenze lontane.</div>
+    </div>`}
+  `;
 }
 
-function Select({ label, value, onChange, options = [], required, style }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, ...style }}>
-      {label && <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{label}{required && <span style={{ color: COLORS.accent }}> *</span>}</label>}
-      <select
-        value={value || ""} onChange={e => onChange(e.target.value)}
-        style={{
-          background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8,
-          padding: "9px 12px", color: value ? COLORS.text : COLORS.muted, fontSize: 14, outline: "none",
-        }}
-      >
-        <option value="">— Seleziona —</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+// ═══════════════════════════════════════════════════════
+// PRODUCTS
+// ═══════════════════════════════════════════════════════
+let prodSearch='', prodSettore='', prodStato='', prodSort='dataScadenza';
+
+function renderProducts() {
+  const el = document.getElementById('page-products');
+  let list = [...products];
+  if(prodSearch) list=list.filter(p=>
+    (p.nomeProdotto||'').toLowerCase().includes(prodSearch.toLowerCase())||
+    (p.fornitore||'').toLowerCase().includes(prodSearch.toLowerCase())||
+    (p.codiceABarre||'').includes(prodSearch)||(p.codiceSKU||'').includes(prodSearch)
+  );
+  if(prodSettore) list=list.filter(p=>p.settore===prodSettore);
+  if(prodStato==='scaduto') list=list.filter(p=>daysLeft(p.dataScadenza)<0);
+  if(prodStato==='urgente') list=list.filter(p=>{const d=daysLeft(p.dataScadenza);return d>=0&&d<=3;});
+  if(prodStato==='ok') list=list.filter(p=>daysLeft(p.dataScadenza)>3);
+  list.sort((a,b)=>{
+    if(prodSort==='dataScadenza') return daysLeft(a.dataScadenza)-daysLeft(b.dataScadenza);
+    if(prodSort==='nome') return (a.nomeProdotto||'').localeCompare(b.nomeProdotto||'');
+    if(prodSort==='fornitore') return (a.fornitore||'').localeCompare(b.fornitore||'');
+    return 0;
+  });
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h1 style="font-size:22px;font-weight:800">Prodotti</h1>
+      <button class="btn btn-primary btn-sm" onclick="openForm()">+ Aggiungi</button>
+    </div>
+    <div class="search-wrap">
+      <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="form-input" placeholder="Cerca nome, codice, fornitore..." value="${prodSearch}" oninput="prodSearch=this.value;renderProducts()" style="padding-left:38px"/>
+    </div>
+    <div class="filter-row">
+      <select class="form-select" onchange="prodSettore=this.value;renderProducts()">
+        <option value="">Tutti i Settori</option>
+        ${categories.settori.map(s=>`<option value="${s}" ${prodSettore===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <select class="form-select" onchange="prodStato=this.value;renderProducts()">
+        <option value="">Tutti gli stati</option>
+        <option value="scaduto" ${prodStato==='scaduto'?'selected':''}>Scaduti</option>
+        <option value="urgente" ${prodStato==='urgente'?'selected':''}>Urgenti ≤3gg</option>
+        <option value="ok" ${prodStato==='ok'?'selected':''}>OK</option>
+      </select>
+      <select class="form-select" onchange="prodSort=this.value;renderProducts()">
+        <option value="dataScadenza">Scadenza ↑</option>
+        <option value="nome">Nome A-Z</option>
+        <option value="fornitore">Fornitore</option>
       </select>
     </div>
-  );
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${list.length} prodotti</div>
+    ${list.length===0 ? '<div class="card" style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:8px">📦</div><div style="color:var(--muted)">Nessun prodotto trovato</div></div>' : ''}
+    ${list.map(p=>{
+      const d=daysLeft(p.dataScadenza), col=statusColor(d);
+      const sub=[p.settore,p.famiglia,p.fornitore].filter(Boolean).join(' · ');
+      return `<div class="prod-row" onclick="openDetail('${p.id}')">
+        <div class="prod-stripe" style="background:${col}"></div>
+        <div style="flex:1;min-width:0">
+          <div class="prod-name">${p.nomeProdotto||'—'}</div>
+          <div class="prod-sub">${sub||'—'}${p.codiceABarre?` · <span style="font-family:DM Mono">${p.codiceABarre}</span>`:''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          ${badge(d)}
+          <div style="font-size:11px;color:var(--muted)">${fmtDate(p.dataScadenza)}</div>
+        </div>
+        <div class="prod-actions" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="openForm('${p.id}')" title="Modifica">✏️</button>
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="if(confirm('Eliminare?')){deleteProduct('${p.id}')}" title="Elimina" style="color:var(--red)">🗑️</button>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
 }
 
-function Textarea({ label, value, onChange, rows = 3 }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {label && <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{label}</label>}
-      <textarea
-        value={value || ""} onChange={e => onChange(e.target.value)} rows={rows}
-        style={{
-          background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8,
-          padding: "9px 12px", color: COLORS.text, fontSize: 14, outline: "none", resize: "vertical",
-        }}
-      />
-    </div>
-  );
-}
+// ═══════════════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════════════
+let reportRange = 7;
+function renderReports() {
+  const el = document.getElementById('page-reports');
+  const scaduti = products.filter(p=>daysLeft(p.dataScadenza)<0);
+  const inScadenza = products.filter(p=>{const d=daysLeft(p.dataScadenza);return d>=0&&d<=reportRange;});
 
-// ─── BUTTON ───────────────────────────────────────────────────────────
-function Btn({ children, onClick, variant = "primary", size = "md", icon, disabled, style }) {
-  const bg = variant === "primary" ? COLORS.accent : variant === "danger" ? COLORS.red : variant === "ghost" ? "transparent" : COLORS.surface;
-  const col = variant === "ghost" ? COLORS.muted : COLORS.text;
-  const border = variant === "ghost" ? `1px solid ${COLORS.border}` : variant === "secondary" ? `1px solid ${COLORS.border}` : "none";
-  const pad = size === "sm" ? "6px 12px" : size === "lg" ? "12px 24px" : "9px 18px";
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      background: bg, color: col, border, borderRadius: 8, padding: pad,
-      fontSize: size === "sm" ? 12 : 14, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-      display: "inline-flex", alignItems: "center", gap: 6, opacity: disabled ? 0.5 : 1,
-      transition: "all .15s", ...style,
-    }}
-      onMouseEnter={e => !disabled && (e.currentTarget.style.filter = "brightness(1.15)")}
-      onMouseLeave={e => e.currentTarget.style.filter = ""}
-    >
-      {icon}{children}
-    </button>
-  );
-}
-
-// ─── CARD ─────────────────────────────────────────────────────────────
-function Card({ children, style }) {
-  return <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: 20, ...style }}>{children}</div>;
-}
-
-// ─── MODAL ────────────────────────────────────────────────────────────
-function Modal({ title, children, onClose, wide }) {
-  return (
-    <div style={{
-      position: "fixed", inset: 0, background: "#000a", zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 16,
-        width: "100%", maxWidth: wide ? 800 : 520, maxHeight: "90vh", overflowY: "auto",
-        padding: 24,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 18, color: COLORS.text }}>{title}</h2>
-          <Btn variant="ghost" size="sm" onClick={onClose} icon={<Icons.X />} />
+  function section(title, list, color) {
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;background:${color};border-radius:50%"></div>
+          <span style="font-weight:700;font-size:14px">${title}</span>
+          <span style="background:${color}22;color:${color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px">${list.length}</span>
         </div>
-        {children}
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV(${JSON.stringify(list).replace(/"/g,'&quot;')},'${title}')">⬇ CSV</button>
       </div>
-    </div>
-  );
-}
-
-// ─── PRODUCT FORM ─────────────────────────────────────────────────────
-function ProductForm({ initial, categories, onSave, onClose }) {
-  const [p, setP] = useState(initial || emptyProduct());
-  const [errors, setErrors] = useState({});
-  const [scanning, setScanning] = useState(null);
-
-  const set = (k, v) => setP(prev => ({ ...prev, [k]: v, ultimaModifica: today() }));
-
-  const famiglie = useMemo(() =>
-    p.settore ? (categories.famiglie[p.settore] || []) : [], [p.settore, categories]);
-  const sottofamiglie = useMemo(() =>
-    p.famiglia ? (categories.sottofamiglie[p.famiglia] || []) : [], [p.famiglia, categories]);
-
-  function validate() {
-    const e = {};
-    if (!p.nomeProdotto.trim()) e.nomeProdotto = true;
-    if (!p.dataScadenza) e.dataScadenza = true;
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }
-
-  function handleSave() {
-    if (validate()) onSave(p);
-  }
-
-  function simulateScan(field) {
-    const fake = field === "codiceABarre" ? "8001234567890" : "QR-2024-PROD-001";
-    set(field, fake);
-    setScanning(null);
-    alert(`✅ Codice rilevato: ${fake}\n(In produzione usa fotocamera reale con html5-qrcode)`);
-  }
-
-  const inputStyle = k => ({ ...(errors[k] ? { borderColor: COLORS.red } : {}) });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Identificazione */}
-      <div>
-        <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>📦 Identificazione</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Input label="Nome Prodotto" value={p.nomeProdotto} onChange={v => set("nomeProdotto", v)} required style={{ gridColumn: "span 2", ...inputStyle("nomeProdotto") }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Codice a Barre</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input value={p.codiceABarre || ""} onChange={e => set("codiceABarre", e.target.value)} style={{ flex: 1, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 14, outline: "none" }} />
-              <Btn variant="secondary" size="sm" onClick={() => simulateScan("codiceABarre")} icon={<Icons.Scan />}>Scansiona</Btn>
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>QR Code</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input value={p.qrCode || ""} onChange={e => set("qrCode", e.target.value)} style={{ flex: 1, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 14, outline: "none" }} />
-              <Btn variant="secondary" size="sm" onClick={() => simulateScan("qrCode")} icon={<Icons.Scan />}>Scansiona</Btn>
-            </div>
-          </div>
-          <Input label="Codice SKU" value={p.codiceSKU} onChange={v => set("codiceSKU", v)} />
-          <Input label="Lotto" value={p.numeroLotto} onChange={v => set("numeroLotto", v)} />
-          <Textarea label="Descrizione" value={p.descrizione} onChange={v => set("descrizione", v)} rows={2} />
-        </div>
-      </div>
-
-      {/* Classificazione */}
-      <div>
-        <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>🗂️ Classificazione</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <Select label="Settore" value={p.settore} onChange={v => set("settore", v)} options={categories.settori} />
-          <Select label="Famiglia" value={p.famiglia} onChange={v => set("famiglia", v)} options={famiglie} />
-          <Select label="Sottofamiglia" value={p.sottofamiglia} onChange={v => set("sottofamiglia", v)} options={sottofamiglie} />
-        </div>
-      </div>
-
-      {/* Date */}
-      <div>
-        <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>📅 Date</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
-          <Input label="Data Produzione" value={p.dataProduzione} onChange={v => set("dataProduzione", v)} type="date" />
-          <Input label="Data Scadenza" value={p.dataScadenza} onChange={v => set("dataScadenza", v)} type="date" required style={inputStyle("dataScadenza")} />
-          <Input label="Data Apertura" value={p.dataApertura} onChange={v => set("dataApertura", v)} type="date" />
-          <Input label="Giorni vita dopo apertura" value={p.giorniVitaDopoApertura} onChange={v => set("giorniVitaDopoApertura", v)} type="number" />
-        </div>
-      </div>
-
-      {/* Fornitore */}
-      <div>
-        <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>🏭 Fornitore & Fattura</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <Input label="Fornitore" value={p.fornitore} onChange={v => set("fornitore", v)} />
-          <Input label="N° Fattura" value={p.numeroFattura} onChange={v => set("numeroFattura", v)} />
-          <Input label="Data Fattura" value={p.dataFattura} onChange={v => set("dataFattura", v)} type="date" />
-        </div>
-      </div>
-
-      {/* Magazzino */}
-      <div>
-        <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>📊 Magazzino</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12 }}>
-          <Input label="Qta Ricevuta" value={p.quantitaRicevuta} onChange={v => set("quantitaRicevuta", v)} type="number" />
-          <Select label="U.M." value={p.unitaMisura} onChange={v => set("unitaMisura", v)} options={["pz", "kg", "g", "l", "ml", "cf"]} />
-          <Input label="Prezzo Unit. €" value={p.prezzoUnitario} onChange={v => set("prezzoUnitario", v)} type="number" />
-          <Input label="Qta Attuale" value={p.quantitaAttuale} onChange={v => set("quantitaAttuale", v)} type="number" />
-          <Input label="Qta Minima" value={p.quantitaMinima} onChange={v => set("quantitaMinima", v)} type="number" />
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <Input label="Posizione (es. Frigo 1 / Scaffale A3)" value={p.posizioneInterna} onChange={v => set("posizioneInterna", v)} />
-        </div>
-      </div>
-
-      <Textarea label="Note" value={p.note} onChange={v => set("note", v)} />
-
-      <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", paddingTop: 8 }}>
-        <Btn variant="ghost" onClick={onClose}>Annulla</Btn>
-        <Btn onClick={handleSave} icon={<Icons.Check />}>Salva Prodotto</Btn>
-      </div>
-    </div>
-  );
-}
-
-// ─── PRODUCT DETAIL ───────────────────────────────────────────────────
-function ProductDetail({ product, onEdit, onDelete, onDuplicate, onClose }) {
-  const days = daysLeft(product.dataScadenza);
-  const Row = ({ label, value }) => value ? (
-    <div style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: `1px solid ${COLORS.border}` }}>
-      <span style={{ fontSize: 12, color: COLORS.muted, minWidth: 160, fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: 13, color: COLORS.text }}>{value}</span>
-    </div>
-  ) : null;
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <Badge days={days} />
-        <span style={{ color: COLORS.muted, fontSize: 13 }}>Scadenza: {formatDate(product.dataScadenza)}</span>
-      </div>
-      <Row label="Nome Prodotto" value={product.nomeProdotto} />
-      <Row label="Codice a Barre" value={product.codiceABarre} />
-      <Row label="QR Code" value={product.qrCode} />
-      <Row label="SKU" value={product.codiceSKU} />
-      <Row label="Lotto" value={product.numeroLotto} />
-      <Row label="Settore" value={product.settore} />
-      <Row label="Famiglia" value={product.famiglia} />
-      <Row label="Sottofamiglia" value={product.sottofamiglia} />
-      <Row label="Data Produzione" value={formatDate(product.dataProduzione)} />
-      <Row label="Data Apertura" value={formatDate(product.dataApertura)} />
-      <Row label="Giorni vita dopo apertura" value={product.giorniVitaDopoApertura} />
-      <Row label="Fornitore" value={product.fornitore} />
-      <Row label="N° Fattura" value={product.numeroFattura} />
-      <Row label="Data Fattura" value={formatDate(product.dataFattura)} />
-      <Row label="Quantità Ricevuta" value={product.quantitaRicevuta ? `${product.quantitaRicevuta} ${product.unitaMisura}` : null} />
-      <Row label="Quantità Attuale" value={product.quantitaAttuale} />
-      <Row label="Quantità Minima" value={product.quantitaMinima} />
-      <Row label="Prezzo Unitario" value={product.prezzoUnitario ? `€ ${product.prezzoUnitario}` : null} />
-      <Row label="Posizione" value={product.posizioneInterna} />
-      <Row label="Note" value={product.note} />
-      <Row label="Inserimento" value={formatDate(product.dataInserimento)} />
-      <Row label="Ultima Modifica" value={formatDate(product.ultimaModifica)} />
-      <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-        <Btn variant="ghost" size="sm" onClick={() => { onDuplicate(product); onClose(); }} icon={<Icons.Copy />}>Duplica</Btn>
-        <Btn variant="secondary" size="sm" onClick={() => { onEdit(product); onClose(); }} icon={<Icons.Edit />}>Modifica</Btn>
-        <Btn variant="danger" size="sm" onClick={() => { if (confirm("Eliminare questo prodotto?")) { onDelete(product.id); onClose(); } }} icon={<Icons.Trash />}>Elimina</Btn>
-      </div>
-    </div>
-  );
-}
-
-// ─── DASHBOARD ────────────────────────────────────────────────────────
-function Dashboard({ products, onAdd, onDetail }) {
-  const scaduti = products.filter(p => daysLeft(p.dataScadenza) < 0);
-  const oggi = products.filter(p => daysLeft(p.dataScadenza) === 0);
-  const presto = products.filter(p => { const d = daysLeft(p.dataScadenza); return d > 0 && d <= 3; });
-  const settimana = products.filter(p => { const d = daysLeft(p.dataScadenza); return d > 3 && d <= 7; });
-
-  const urgent = [...products].filter(p => daysLeft(p.dataScadenza) <= 7).sort((a, b) => daysLeft(a.dataScadenza) - daysLeft(b.dataScadenza));
-
-  const StatCard = ({ label, value, color, icon }) => (
-    <Card style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 32, fontWeight: 800, color, fontFamily: "monospace" }}>{value}</div>
-      <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4, fontWeight: 600 }}>{label}</div>
-    </Card>
-  );
-
-  return (
-    <div style={{ padding: "0 0 80px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      ${list.length===0?`<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">Nessun prodotto</div>`:
+      list.map(p=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);align-items:center">
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: COLORS.text }}>Dashboard</h1>
-          <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+          <div style="font-weight:600;font-size:13px">${p.nomeProdotto}</div>
+          <div style="font-size:11px;color:var(--muted)">${p.fornitore||'—'} ${p.numeroFattura?'· Fatt. '+p.numeroFattura:''}</div>
         </div>
-        <Btn onClick={onAdd} icon={<Icons.Plus />}>Nuovo Prodotto</Btn>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
-        <StatCard label="Prodotti Totali" value={products.length} color={COLORS.text} />
-        <StatCard label="Scaduti" value={scaduti.length} color={COLORS.red} />
-        <StatCard label="Scadono Oggi" value={oggi.length} color={COLORS.yellow} />
-        <StatCard label="Scadono in 3 gg" value={presto.length} color={COLORS.accent} />
-      </div>
-
-      {urgent.length > 0 && (
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            <Icons.AlertTriangle />
-            <span style={{ fontWeight: 700, fontSize: 15 }}>Prodotti Urgenti</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {urgent.map(p => {
-              const days = daysLeft(p.dataScadenza);
-              const col = statusColor(days);
-              return (
-                <div key={p.id} onClick={() => onDetail(p)} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 14px", background: col + "11", border: `1px solid ${col}33`,
-                  borderRadius: 10, cursor: "pointer", transition: "all .15s",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = col + "22"}
-                  onMouseLeave={e => e.currentTarget.style.background = col + "11"}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{p.nomeProdotto}</div>
-                    <div style={{ fontSize: 12, color: COLORS.muted }}>{p.fornitore || "—"} · {p.settore || "—"}</div>
-                  </div>
-                  <Badge days={days} />
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {urgent.length === 0 && (
-        <Card style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>Nessuna urgenza!</div>
-          <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>Tutti i prodotti hanno scadenze lontane.</div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// ─── PRODUCT LIST ─────────────────────────────────────────────────────
-function ProductList({ products, categories, onAdd, onEdit, onDelete, onDetail, onDuplicate }) {
-  const [search, setSearch] = useState("");
-  const [filterSettore, setFilterSettore] = useState("");
-  const [filterStato, setFilterStato] = useState("");
-  const [sortKey, setSortKey] = useState("dataScadenza");
-
-  const filtered = useMemo(() => {
-    let list = [...products];
-    if (search) list = list.filter(p =>
-      p.nomeProdotto?.toLowerCase().includes(search.toLowerCase()) ||
-      p.fornitore?.toLowerCase().includes(search.toLowerCase()) ||
-      p.codiceABarre?.includes(search) || p.codiceSKU?.includes(search)
-    );
-    if (filterSettore) list = list.filter(p => p.settore === filterSettore);
-    if (filterStato === "scaduto") list = list.filter(p => daysLeft(p.dataScadenza) < 0);
-    if (filterStato === "urgente") list = list.filter(p => { const d = daysLeft(p.dataScadenza); return d >= 0 && d <= 3; });
-    if (filterStato === "ok") list = list.filter(p => daysLeft(p.dataScadenza) > 3);
-    list.sort((a, b) => {
-      if (sortKey === "dataScadenza") return new Date(a.dataScadenza) - new Date(b.dataScadenza);
-      if (sortKey === "nome") return a.nomeProdotto.localeCompare(b.nomeProdotto);
-      if (sortKey === "fornitore") return (a.fornitore || "").localeCompare(b.fornitore || "");
-      return 0;
-    });
-    return list;
-  }, [products, search, filterSettore, filterStato, sortKey]);
-
-  return (
-    <div style={{ paddingBottom: 80 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Prodotti</h1>
-        <Btn onClick={onAdd} icon={<Icons.Plus />}>Aggiungi</Btn>
-      </div>
-
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10 }}>
-          <div style={{ position: "relative" }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca per nome, codice, fornitore..."
-              style={{ width: "100%", background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px 9px 36px", color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
-            <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: COLORS.muted }}>
-              <Icons.Search />
-            </div>
-          </div>
-          <select value={filterSettore} onChange={e => setFilterSettore(e.target.value)} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
-            <option value="">Tutti i Settori</option>
-            {categories.settori.map(s => <option key={s}>{s}</option>)}
-          </select>
-          <select value={filterStato} onChange={e => setFilterStato(e.target.value)} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
-            <option value="">Tutti gli stati</option>
-            <option value="scaduto">Scaduti</option>
-            <option value="urgente">Urgenti (≤3gg)</option>
-            <option value="ok">OK</option>
-          </select>
-          <select value={sortKey} onChange={e => setSortKey(e.target.value)} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
-            <option value="dataScadenza">Ordina: Scadenza</option>
-            <option value="nome">Ordina: Nome</option>
-            <option value="fornitore">Ordina: Fornitore</option>
-          </select>
-        </div>
-      </Card>
-
-      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10 }}>{filtered.length} prodotti trovati</div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {filtered.length === 0 && (
-          <Card style={{ textAlign: "center", padding: 40 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
-            <div style={{ color: COLORS.muted }}>Nessun prodotto trovato</div>
-          </Card>
-        )}
-        {filtered.map(p => {
-          const days = daysLeft(p.dataScadenza);
-          const col = statusColor(days);
-          return (
-            <Card key={p.id} style={{ padding: "12px 16px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ flex: 1, cursor: "pointer" }} onClick={() => onDetail(p)}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 4, height: 36, background: col, borderRadius: 4, flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{p.nomeProdotto}</div>
-                      <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>
-                        {[p.settore, p.famiglia, p.fornitore].filter(Boolean).join(" · ")}
-                        {p.codiceABarre && <> · <span style={{ fontFamily: "monospace" }}>{p.codiceABarre}</span></>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                  <div style={{ textAlign: "right" }}>
-                    <Badge days={days} />
-                    <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>{formatDate(p.dataScadenza)}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <Btn variant="ghost" size="sm" onClick={() => onDuplicate(p)} icon={<Icons.Copy />} style={{ padding: "6px 8px" }} />
-                    <Btn variant="ghost" size="sm" onClick={() => onEdit(p)} icon={<Icons.Edit />} style={{ padding: "6px 8px" }} />
-                    <Btn variant="ghost" size="sm" onClick={() => { if (confirm("Eliminare?")) onDelete(p.id); }} icon={<Icons.Trash />} style={{ padding: "6px 8px", color: COLORS.red }} />
-                  </div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── REPORTS ──────────────────────────────────────────────────────────
-function Reports({ products }) {
-  const [range, setRange] = useState(7);
-  const scaduti = products.filter(p => daysLeft(p.dataScadenza) < 0);
-  const inScadenza = products.filter(p => { const d = daysLeft(p.dataScadenza); return d >= 0 && d <= range; });
-
-  function exportCSV(list, name) {
-    const headers = ["Nome", "Scadenza", "Fornitore", "Settore", "Famiglia", "SKU", "N°Fattura", "Posizione", "Note"];
-    const rows = list.map(p => [
-      p.nomeProdotto, p.dataScadenza, p.fornitore, p.settore, p.famiglia,
-      p.codiceSKU, p.numeroFattura, p.posizioneInterna, p.note,
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `${name}.csv`; a.click();
+        ${badge(daysLeft(p.dataScadenza))}
+      </div>`).join('')}
+    </div>`;
   }
 
-  const Section = ({ title, list, color }) => (
-    <Card style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 12, height: 12, background: color, borderRadius: "50%" }} />
-          <span style={{ fontWeight: 700, fontSize: 15 }}>{title}</span>
-          <span style={{ background: color + "22", color, fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 12 }}>{list.length}</span>
-        </div>
-        <Btn variant="ghost" size="sm" onClick={() => exportCSV(list, title)} icon={<Icons.Download />}>CSV</Btn>
-      </div>
-      {list.length === 0
-        ? <div style={{ color: COLORS.muted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>Nessun prodotto</div>
-        : list.map(p => (
-          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.nomeProdotto}</div>
-              <div style={{ fontSize: 11, color: COLORS.muted }}>{p.fornitore} {p.numeroFattura ? `· Fatt. ${p.numeroFattura}` : ""}</div>
-            </div>
-            <Badge days={daysLeft(p.dataScadenza)} />
-          </div>
-        ))
-      }
-    </Card>
-  );
+  el.innerHTML = `
+    <h1 style="font-size:22px;font-weight:800;margin-bottom:16px">Report Scadenze</h1>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <label style="font-size:13px;color:var(--muted)">Mostra entro:</label>
+      <select class="form-select" style="width:auto" onchange="reportRange=+this.value;renderReports()">
+        ${[1,3,7,14,30].map(n=>`<option value="${n}" ${reportRange===n?'selected':''}>${n} giorni</option>`).join('')}
+      </select>
+    </div>
+    ${section('Prodotti Scaduti',scaduti,'#ef4444')}
+    ${section('In scadenza entro '+reportRange+' giorni',inScadenza,'#eab308')}
+  `;
+}
 
-  return (
-    <div style={{ paddingBottom: 80 }}>
-      <h1 style={{ margin: "0 0 20px", fontSize: 22, fontWeight: 800 }}>Report Scadenze</h1>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <label style={{ fontSize: 13, color: COLORS.muted }}>Mostra prodotti in scadenza entro:</label>
-        <select value={range} onChange={e => setRange(+e.target.value)} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
-          {[1, 3, 7, 14, 30].map(n => <option key={n} value={n}>{n} giorni</option>)}
+function exportCSV(list, name) {
+  const hdr = ['Nome','Scadenza','Fornitore','Settore','Famiglia','SKU','N°Fattura','Lotto','Posizione','Note'];
+  const rows = list.map(p=>[p.nomeProdotto,p.dataScadenza,p.fornitore,p.settore,p.famiglia,p.codiceSKU,p.numeroFattura,p.numeroLotto,p.posizioneInterna,p.note]);
+  const csv = [hdr,...rows].map(r=>r.map(c=>`"${(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=name+'.csv'; a.click();
+}
+
+// ═══════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════
+let settingsTab = 'alerts';
+function renderSettings() {
+  const el = document.getElementById('page-settings');
+  el.innerHTML = `
+    <h1 style="font-size:22px;font-weight:800;margin-bottom:16px">Impostazioni</h1>
+    <div class="tabs">
+      <button class="tab-btn ${settingsTab==='alerts'?'active':''}" onclick="settingsTab='alerts';renderSettings()">🔔 Alert</button>
+      <button class="tab-btn ${settingsTab==='categories'?'active':''}" onclick="settingsTab='categories';renderSettings()">🗂️ Categorie</button>
+      <button class="tab-btn ${settingsTab==='shop'?'active':''}" onclick="settingsTab='shop';renderSettings()">🏪 Negozio</button>
+      <button class="tab-btn ${settingsTab==='backup'?'active':''}" onclick="settingsTab='backup';renderSettings()">💾 Backup</button>
+    </div>
+    <div id="settings-content"></div>
+  `;
+  renderSettingsTab();
+}
+
+function renderSettingsTab() {
+  const el = document.getElementById('settings-content');
+  if(!el) return;
+  if(settingsTab==='alerts') renderAlertsTab(el);
+  if(settingsTab==='categories') renderCategoriesTab(el);
+  if(settingsTab==='shop') renderShopTab(el);
+  if(settingsTab==='backup') renderBackupTab(el);
+}
+
+function renderAlertsTab(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span style="font-weight:700">Soglie di Allerta</span>
+        <button class="btn btn-primary btn-sm" onclick="addAlert()">+ Aggiungi</button>
+      </div>
+      ${alerts.map(a=>`
+        <div style="display:flex;gap:8px;align-items:center;background:var(--subtle);padding:10px 12px;border-radius:10px;margin-bottom:8px;flex-wrap:wrap">
+          <input type="checkbox" ${a.attivo?'checked':''} onchange="updateAlert('${a.id}','attivo',this.checked)" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0"/>
+          <input class="form-input" value="${a.label}" oninput="updateAlert('${a.id}','label',this.value)" style="flex:1;min-width:120px;padding:7px 10px;font-size:13px"/>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" class="form-input" min="0" max="365" value="${a.giorni}" oninput="updateAlert('${a.id}','giorni',+this.value)" style="width:60px;text-align:center;padding:7px 8px;font-size:13px"/>
+            <span style="font-size:11px;color:var(--muted)">gg</span>
+          </div>
+          <input type="time" class="form-input" value="${a.ora}" oninput="updateAlert('${a.id}','ora',this.value)" style="width:100px;padding:7px 8px;font-size:13px"/>
+          <button class="btn btn-secondary btn-sm" onclick="playAlert();showToast('🔔 Alert di test!')">Test</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeAlert('${a.id}')">🗑️</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderCategoriesTab(el) {
+  const allFamiglie = Object.values(categories.famiglie).flat();
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:12px">Settori</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input class="form-input" id="new-settore" placeholder="Nuovo settore..." style="flex:1"/>
+        <button class="btn btn-primary btn-sm" onclick="addSettore()">+ Aggiungi</button>
+      </div>
+      <div>${categories.settori.map(s=>`<span class="chip">${s}<button class="chip-del" onclick="removeSettore('${s}')">×</button></span>`).join('')}</div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:12px">Famiglie</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <select class="form-select" id="fam-settore" style="flex:1;min-width:120px">
+          <option value="">Settore...</option>
+          ${categories.settori.map(s=>`<option>${s}</option>`).join('')}
         </select>
+        <input class="form-input" id="new-famiglia" placeholder="Nome famiglia..." style="flex:1;min-width:120px"/>
+        <button class="btn btn-primary btn-sm" onclick="addFamiglia()">+ Aggiungi</button>
       </div>
-      <Section title="Prodotti Scaduti" list={scaduti} color={COLORS.red} />
-      <Section title={`In scadenza entro ${range} giorni`} list={inScadenza} color={COLORS.yellow} />
+      ${Object.entries(categories.famiglie).map(([s,fams])=>fams.length?`
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:4px">${s}</div>
+          <div>${fams.map(f=>`<span class="chip">${f}<button class="chip-del" onclick="removeFamiglia('${s}','${f}')">×</button></span>`).join('')}</div>
+        </div>`:'').join('')}
     </div>
-  );
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:12px">Sottofamiglie</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <select class="form-select" id="sotto-famiglia" style="flex:1;min-width:120px">
+          <option value="">Famiglia...</option>
+          ${allFamiglie.map(f=>`<option>${f}</option>`).join('')}
+        </select>
+        <input class="form-input" id="new-sotto" placeholder="Nome sottofamiglia..." style="flex:1;min-width:120px"/>
+        <button class="btn btn-primary btn-sm" onclick="addSottofamiglia()">+ Aggiungi</button>
+      </div>
+      ${Object.entries(categories.sottofamiglie).map(([f,subs])=>subs&&subs.length?`
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:4px">${f}</div>
+          <div>${subs.map(s=>`<span class="chip">${s}<button class="chip-del" onclick="removeSottofamiglia('${f}','${s}')">×</button></span>`).join('')}</div>
+        </div>`:'').join('')}
+    </div>
+  `;
 }
 
-// ─── SETTINGS ─────────────────────────────────────────────────────────
-function Settings({ alerts, setAlerts, categories, setCategories, shopName, setShopName }) {
-  const [tab, setTab] = useState("alerts");
-  const [newSettore, setNewSettore] = useState("");
-  const [newFamiglia, setNewFamiglia] = useState({ settore: "", nome: "" });
-  const [newSotto, setNewSotto] = useState({ famiglia: "", nome: "" });
-
-  function addAlert() {
-    setAlerts(prev => [...prev, { id: uuid(), giorni: 1, ora: "08:00", attivo: true, label: "Nuovo alert" }]);
-  }
-  function updateAlert(id, key, val) {
-    setAlerts(prev => prev.map(a => a.id === id ? { ...a, [key]: val } : a));
-  }
-  function removeAlert(id) {
-    setAlerts(prev => prev.filter(a => a.id !== id));
-  }
-
-  function addSettore() {
-    if (!newSettore.trim()) return;
-    setCategories(prev => ({ ...prev, settori: [...prev.settori, newSettore.trim()], famiglie: { ...prev.famiglie, [newSettore.trim()]: [] } }));
-    setNewSettore("");
-  }
-  function removeSettore(s) {
-    setCategories(prev => { const { [s]: _, ...rest } = prev.famiglie; return { ...prev, settori: prev.settori.filter(x => x !== s), famiglie: rest }; });
-  }
-  function addFamiglia() {
-    if (!newFamiglia.settore || !newFamiglia.nome.trim()) return;
-    setCategories(prev => ({
-      ...prev,
-      famiglie: { ...prev.famiglie, [newFamiglia.settore]: [...(prev.famiglie[newFamiglia.settore] || []), newFamiglia.nome.trim()] },
-      sottofamiglie: { ...prev.sottofamiglie, [newFamiglia.nome.trim()]: [] },
-    }));
-    setNewFamiglia({ settore: "", nome: "" });
-  }
-  function addSottofamiglia() {
-    if (!newSotto.famiglia || !newSotto.nome.trim()) return;
-    setCategories(prev => ({
-      ...prev,
-      sottofamiglie: { ...prev.sottofamiglie, [newSotto.famiglia]: [...(prev.sottofamiglie[newSotto.famiglia] || []), newSotto.nome.trim()] },
-    }));
-    setNewSotto({ famiglia: "", nome: "" });
-  }
-
-  const TabBtn = ({ id, label }) => (
-    <button onClick={() => setTab(id)} style={{
-      padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer",
-      background: tab === id ? COLORS.accent : "transparent",
-      color: tab === id ? "#fff" : COLORS.muted, fontWeight: 600, fontSize: 13,
-    }}>{label}</button>
-  );
-
-  return (
-    <div style={{ paddingBottom: 80 }}>
-      <h1 style={{ margin: "0 0 20px", fontSize: 22, fontWeight: 800 }}>Impostazioni</h1>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, background: COLORS.surface, padding: 6, borderRadius: 12 }}>
-        <TabBtn id="alerts" label="🔔 Alert" />
-        <TabBtn id="categories" label="🗂️ Categorie" />
-        <TabBtn id="shop" label="🏪 Negozio" />
-        <TabBtn id="backup" label="💾 Backup" />
+function renderShopTab(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:14px">Informazioni Negozio</div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Nome Negozio</label>
+        <input class="form-input" value="${shopName}" oninput="shopName=this.value;saveShop();updateHeaderBadge()"/>
       </div>
+      <div style="background:var(--subtle);border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:8px">📲 Come installare l'app su Android</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.7">
+          1. Apri questa pagina in <b>Chrome</b><br>
+          2. Tocca il menu ⋮ in alto a destra<br>
+          3. Seleziona <b>"Aggiungi a schermata Home"</b><br>
+          4. Conferma → L'app è installata! 🎉
+        </div>
+      </div>
+    </div>
+  `;
+}
 
-      {tab === "alerts" && (
-        <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <span style={{ fontWeight: 700 }}>Soglie di Allerta</span>
-            <Btn size="sm" onClick={addAlert} icon={<Icons.Plus />}>Aggiungi</Btn>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {alerts.map(a => (
-              <div key={a.id} style={{ display: "flex", gap: 10, alignItems: "center", background: COLORS.surface, padding: "10px 14px", borderRadius: 10 }}>
-                <input type="checkbox" checked={a.attivo} onChange={e => updateAlert(a.id, "attivo", e.target.checked)} style={{ accentColor: COLORS.accent, width: 18, height: 18 }} />
-                <input value={a.label} onChange={e => updateAlert(a.id, "label", e.target.value)} style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 13, outline: "none" }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <input type="number" min={0} max={365} value={a.giorni} onChange={e => updateAlert(a.id, "giorni", +e.target.value)} style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 8px", color: COLORS.text, fontSize: 13, outline: "none", textAlign: "center" }} />
-                  <span style={{ fontSize: 12, color: COLORS.muted }}>gg</span>
-                </div>
-                <input type="time" value={a.ora} onChange={e => updateAlert(a.id, "ora", e.target.value)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 8px", color: COLORS.text, fontSize: 13, outline: "none" }} />
-                <Btn variant="ghost" size="sm" onClick={() => { playAlert(); alert("🔔 Alert di test!"); }} style={{ padding: "6px 8px" }}>Test</Btn>
-                <Btn variant="ghost" size="sm" onClick={() => removeAlert(a.id)} icon={<Icons.Trash />} style={{ padding: "6px 8px", color: COLORS.red }} />
+function renderBackupTab(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:14px">Backup & Ripristino</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-secondary" onclick="exportBackup()">⬇️ Esporta backup JSON</button>
+        <label style="cursor:pointer">
+          <div class="btn btn-secondary" style="width:100%;justify-content:center">📂 Importa backup JSON</div>
+          <input type="file" accept=".json" style="display:none" onchange="importBackup(this)"/>
+        </label>
+        <button class="btn btn-danger" onclick="if(confirm('Eliminare TUTTI i prodotti?')){products=[];save();renderDashboard();updateHeaderBadge();showToast('🗑️ Tutti i prodotti eliminati');}">🗑️ Elimina tutti i prodotti</button>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+// ALERT MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function addAlert() { alerts.push({id:uuid(),giorni:1,ora:'08:00',attivo:true,label:'Nuovo alert'}); saveAlerts(); renderSettingsTab(); }
+function updateAlert(id,k,v) { alerts=alerts.map(a=>a.id===id?{...a,[k]:v}:a); saveAlerts(); }
+function removeAlert(id) { alerts=alerts.filter(a=>a.id!==id); saveAlerts(); renderSettingsTab(); }
+
+// ═══════════════════════════════════════════════════════
+// CATEGORIES MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function addSettore() {
+  const v=document.getElementById('new-settore')?.value?.trim(); if(!v) return;
+  if(!categories.settori.includes(v)){categories.settori.push(v); categories.famiglie[v]=[];}
+  saveCategories(); renderSettingsTab();
+}
+function removeSettore(s) { categories.settori=categories.settori.filter(x=>x!==s); delete categories.famiglie[s]; saveCategories(); renderSettingsTab(); }
+function addFamiglia() {
+  const s=document.getElementById('fam-settore')?.value, n=document.getElementById('new-famiglia')?.value?.trim();
+  if(!s||!n) return;
+  if(!categories.famiglie[s]) categories.famiglie[s]=[];
+  if(!categories.famiglie[s].includes(n)){ categories.famiglie[s].push(n); categories.sottofamiglie[n]=[];}
+  saveCategories(); renderSettingsTab();
+}
+function removeFamiglia(s,f) { categories.famiglie[s]=categories.famiglie[s].filter(x=>x!==f); saveCategories(); renderSettingsTab(); }
+function addSottofamiglia() {
+  const f=document.getElementById('sotto-famiglia')?.value, n=document.getElementById('new-sotto')?.value?.trim();
+  if(!f||!n) return;
+  if(!categories.sottofamiglie[f]) categories.sottofamiglie[f]=[];
+  if(!categories.sottofamiglie[f].includes(n)) categories.sottofamiglie[f].push(n);
+  saveCategories(); renderSettingsTab();
+}
+function removeSottofamiglia(f,s) { categories.sottofamiglie[f]=categories.sottofamiglie[f].filter(x=>x!==s); saveCategories(); renderSettingsTab(); }
+
+// ═══════════════════════════════════════════════════════
+// PRODUCT CRUD
+// ═══════════════════════════════════════════════════════
+function deleteProduct(id) { products=products.filter(p=>p.id!==id); save(); renderPage(currentPage); updateHeaderBadge(); showToast('🗑️ Eliminato'); }
+function duplicateProduct(p) { const dup={...p,id:uuid(),dataInserimento:todayStr(),ultimaModifica:todayStr()}; products.push(dup); save(); showToast('📋 Duplicato!'); renderPage(currentPage); updateHeaderBadge(); }
+
+// ═══════════════════════════════════════════════════════
+// FORM MODAL
+// ═══════════════════════════════════════════════════════
+function openForm(id) {
+  editingId = id||null;
+  const p = id ? products.find(x=>x.id===id) : emptyProd();
+  if(!p) return;
+  const famiglie = p.settore ? (categories.famiglie[p.settore]||[]) : [];
+  const sottofamiglie = p.famiglia ? (categories.sottofamiglie[p.famiglia]||[]) : [];
+
+  const mc = document.getElementById('modal-container');
+  mc.innerHTML = `
+    <div class="modal-overlay" id="form-overlay" onclick="if(event.target===this)closeModal('form-overlay')">
+      <div class="modal-box" style="max-width:700px;margin:auto">
+        <div class="modal-header">
+          <div class="modal-title">${id?'✏️ Modifica Prodotto':'➕ Nuovo Prodotto'}</div>
+          <button class="btn btn-ghost btn-icon" onclick="closeModal('form-overlay')">✕</button>
+        </div>
+
+        <!-- IDENTIFICAZIONE -->
+        <div class="form-section">
+          <div class="card-title">📦 Identificazione</div>
+          <div class="form-grid form-grid-2" style="margin-bottom:10px">
+            <div class="form-group" style="grid-column:span 2">
+              <label class="form-label">Nome Prodotto <span class="req">*</span></label>
+              <input class="form-input" id="f-nome" value="${p.nomeProdotto||''}" placeholder="es. Prosciutto San Daniele"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Codice a Barre</label>
+              <div style="display:flex;gap:6px">
+                <input class="form-input" id="f-barcode" value="${p.codiceABarre||''}" placeholder="EAN-13"/>
+                <button class="btn btn-secondary btn-sm" onclick="scanCode('f-barcode')" style="flex-shrink:0">📷</button>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {tab === "categories" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Settori */}
-          <Card>
-            <div style={{ fontWeight: 700, marginBottom: 12 }}>Settori</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input value={newSettore} onChange={e => setNewSettore(e.target.value)} placeholder="Nuovo settore..." style={{ flex: 1, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }} />
-              <Btn size="sm" onClick={addSettore} icon={<Icons.Plus />}>Aggiungi</Btn>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {categories.settori.map(s => (
-                <div key={s} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "5px 12px" }}>
-                  <span style={{ fontSize: 13 }}>{s}</span>
-                  <button onClick={() => removeSettore(s)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.red, padding: 0, fontSize: 16, lineHeight: 1 }}>×</button>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Famiglie */}
-          <Card>
-            <div style={{ fontWeight: 700, marginBottom: 12 }}>Famiglie</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <select value={newFamiglia.settore} onChange={e => setNewFamiglia(p => ({ ...p, settore: e.target.value }))} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
-                <option value="">Settore...</option>
-                {categories.settori.map(s => <option key={s}>{s}</option>)}
-              </select>
-              <input value={newFamiglia.nome} onChange={e => setNewFamiglia(p => ({ ...p, nome: e.target.value }))} placeholder="Nome famiglia..." style={{ flex: 1, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }} />
-              <Btn size="sm" onClick={addFamiglia} icon={<Icons.Plus />}>Aggiungi</Btn>
-            </div>
-            {Object.entries(categories.famiglie).map(([settore, fams]) => fams.length > 0 && (
-              <div key={settore} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, marginBottom: 6 }}>{settore}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {fams.map(f => (
-                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "4px 10px" }}>
-                      <span style={{ fontSize: 12 }}>{f}</span>
-                      <button onClick={() => setCategories(prev => ({ ...prev, famiglie: { ...prev.famiglie, [settore]: prev.famiglie[settore].filter(x => x !== f) } }))} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.red, padding: 0 }}>×</button>
-                    </div>
-                  ))}
-                </div>
+            <div class="form-group">
+              <label class="form-label">QR Code</label>
+              <div style="display:flex;gap:6px">
+                <input class="form-input" id="f-qr" value="${p.qrCode||''}" placeholder="QR Code"/>
+                <button class="btn btn-secondary btn-sm" onclick="scanCode('f-qr')" style="flex-shrink:0">📷</button>
               </div>
-            ))}
-          </Card>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Codice SKU</label>
+              <input class="form-input" id="f-sku" value="${p.codiceSKU||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">N° Lotto</label>
+              <input class="form-input" id="f-lotto" value="${p.numeroLotto||''}"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descrizione</label>
+            <textarea class="form-textarea" id="f-desc" rows="2">${p.descrizione||''}</textarea>
+          </div>
+        </div>
 
-          {/* Sottofamiglie */}
-          <Card>
-            <div style={{ fontWeight: 700, marginBottom: 12 }}>Sottofamiglie</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <select value={newSotto.famiglia} onChange={e => setNewSotto(p => ({ ...p, famiglia: e.target.value }))} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
-                <option value="">Famiglia...</option>
-                {Object.values(categories.famiglie).flat().map(f => <option key={f}>{f}</option>)}
+        <!-- CLASSIFICAZIONE -->
+        <div class="form-section">
+          <div class="card-title">🗂️ Classificazione</div>
+          <div class="form-grid form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Settore</label>
+              <select class="form-select" id="f-settore" onchange="onSettoreChange()">
+                <option value="">— Seleziona —</option>
+                ${categories.settori.map(s=>`<option value="${s}" ${p.settore===s?'selected':''}>${s}</option>`).join('')}
               </select>
-              <input value={newSotto.nome} onChange={e => setNewSotto(p => ({ ...p, nome: e.target.value }))} placeholder="Nome sottofamiglia..." style={{ flex: 1, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }} />
-              <Btn size="sm" onClick={addSottofamiglia} icon={<Icons.Plus />}>Aggiungi</Btn>
             </div>
-          </Card>
+            <div class="form-group">
+              <label class="form-label">Famiglia</label>
+              <select class="form-select" id="f-famiglia" onchange="onFamigliaChange()">
+                <option value="">— Seleziona —</option>
+                ${famiglie.map(f=>`<option value="${f}" ${p.famiglia===f?'selected':''}>${f}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sottofamiglia</label>
+              <select class="form-select" id="f-sotto">
+                <option value="">— Seleziona —</option>
+                ${sottofamiglie.map(s=>`<option value="${s}" ${p.sottofamiglia===s?'selected':''}>${s}</option>`).join('')}
+              </select>
+            </div>
+          </div>
         </div>
-      )}
 
-      {tab === "shop" && (
-        <Card>
-          <div style={{ fontWeight: 700, marginBottom: 16 }}>Informazioni Negozio</div>
-          <Input label="Nome Negozio" value={shopName} onChange={setShopName} />
-          <div style={{ marginTop: 16, padding: 14, background: COLORS.surface, borderRadius: 10 }}>
-            <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 8 }}>💡 Per installare l'app su smartphone:</div>
-            <div style={{ fontSize: 13, color: COLORS.text }}>
-              <b>Android (Chrome):</b> Menu ⋮ → "Aggiungi a schermata Home"<br />
-              <b>iPhone (Safari):</b> Condividi → "Aggiungi a schermata Home"
+        <!-- DATE -->
+        <div class="form-section">
+          <div class="card-title">📅 Date</div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Data Produzione</label>
+              <input type="date" class="form-input" id="f-dprod" value="${p.dataProduzione||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data Scadenza <span class="req">*</span></label>
+              <input type="date" class="form-input" id="f-dscad" value="${p.dataScadenza||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data Apertura</label>
+              <input type="date" class="form-input" id="f-dapert" value="${p.dataApertura||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Giorni vita dopo apertura</label>
+              <input type="number" class="form-input" id="f-vita" value="${p.giorniVitaDopoApertura||''}"/>
             </div>
           </div>
-        </Card>
-      )}
+        </div>
 
-      {tab === "backup" && (
-        <Card>
-          <div style={{ fontWeight: 700, marginBottom: 16 }}>Backup & Ripristino</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <Btn icon={<Icons.Download />} onClick={() => {
-              const data = { products: store.get("products", []), categories: store.get("categories", {}), alerts: store.get("alerts", []) };
-              const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a"); a.href = url; a.download = `backup-scadenze-${today()}.json`; a.click();
-            }}>Esporta backup JSON</Btn>
-            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-              <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, color: COLORS.text }}>📂 Importa backup JSON</div>
-              <input type="file" accept=".json" style={{ display: "none" }} onChange={e => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const r = new FileReader();
-                r.onload = ev => {
-                  try {
-                    const data = JSON.parse(ev.target.result);
-                    if (data.products) store.set("products", data.products);
-                    if (data.categories) store.set("categories", data.categories);
-                    if (data.alerts) store.set("alerts", data.alerts);
-                    alert("✅ Backup ripristinato! Ricarica la pagina.");
-                  } catch { alert("❌ File non valido."); }
-                };
-                r.readAsText(file);
-              }} />
-            </label>
+        <!-- FORNITORE -->
+        <div class="form-section">
+          <div class="card-title">🏭 Fornitore & Fattura</div>
+          <div class="form-grid form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Fornitore</label>
+              <input class="form-input" id="f-forn" value="${p.fornitore||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">N° Fattura</label>
+              <input class="form-input" id="f-fatt" value="${p.numeroFattura||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data Fattura</label>
+              <input type="date" class="form-input" id="f-dfatt" value="${p.dataFattura||''}"/>
+            </div>
           </div>
-        </Card>
-      )}
+        </div>
+
+        <!-- MAGAZZINO -->
+        <div class="form-section">
+          <div class="card-title">📊 Magazzino</div>
+          <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="form-group">
+              <label class="form-label">Posizione</label>
+              <input class="form-input" id="f-pos" value="${p.posizioneInterna||''}" placeholder="es. Frigo 1"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qta Ricevuta</label>
+              <input type="number" class="form-input" id="f-qtar" value="${p.quantitaRicevuta||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">U.M.</label>
+              <select class="form-select" id="f-um">
+                ${['pz','kg','g','l','ml','cf'].map(u=>`<option ${p.unitaMisura===u?'selected':''}>${u}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qta Attuale</label>
+              <input type="number" class="form-input" id="f-qtaa" value="${p.quantitaAttuale||''}"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qta Min.</label>
+              <input type="number" class="form-input" id="f-qtam" value="${p.quantitaMinima||''}"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prezzo Unitario €</label>
+            <input type="number" class="form-input" id="f-prezzo" value="${p.prezzoUnitario||''}" style="max-width:160px"/>
+          </div>
+        </div>
+
+        <!-- NOTE -->
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Note</label>
+          <textarea class="form-textarea" id="f-note" rows="2">${p.note||''}</textarea>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeModal('form-overlay')">Annulla</button>
+          ${id?`<button class="btn btn-secondary" onclick="duplicateFromForm()">📋 Duplica</button>`:''}
+          <button class="btn btn-primary" onclick="saveForm('${p.id}')">✅ Salva</button>
+        </div>
+      </div>
     </div>
-  );
+  `;
+
+  // Make overlay center on tablet+
+  if(window.innerWidth>600) document.getElementById('form-overlay').classList.add('center');
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────
-export default function App() {
-  const [products, setProducts] = useState(() => store.get("products", []));
-  const [categories, setCategories] = useState(() => store.get("categories", DEFAULT_CATEGORIES));
-  const [alerts, setAlerts] = useState(() => store.get("alerts", DEFAULT_ALERTS));
-  const [shopName, setShopName] = useState(() => store.get("shopName", "Deli Manager"));
-  const [page, setPage] = useState("dashboard");
-  const [editProduct, setEditProduct] = useState(null);
-  const [detailProduct, setDetailProduct] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [notification, setNotification] = useState(null);
-  const alertCheckRef = useRef(null);
-
-  // Persist
-  useEffect(() => { store.set("products", products); }, [products]);
-  useEffect(() => { store.set("categories", categories); }, [categories]);
-  useEffect(() => { store.set("alerts", alerts); }, [alerts]);
-  useEffect(() => { store.set("shopName", shopName); }, [shopName]);
-
-  // Alert checker
-  useEffect(() => {
-    function checkAlerts() {
-      const now = new Date();
-      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      alerts.filter(a => a.attivo && a.ora === hhmm).forEach(a => {
-        const urgent = products.filter(p => {
-          const d = daysLeft(p.dataScadenza);
-          return d === a.giorni;
-        });
-        if (urgent.length > 0) {
-          playAlert();
-          setNotification({ text: `⏰ ${a.label}: ${urgent.length} prodotto/i in scadenza!`, type: "warn" });
-          setTimeout(() => setNotification(null), 6000);
-        }
-      });
-    }
-    alertCheckRef.current = setInterval(checkAlerts, 60000);
-    return () => clearInterval(alertCheckRef.current);
-  }, [alerts, products]);
-
-  // Notification toast
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  function saveProduct(p) {
-    setProducts(prev => {
-      const idx = prev.findIndex(x => x.id === p.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = p; return next; }
-      return [...prev, p];
-    });
-    setShowForm(false);
-    setEditProduct(null);
-    setNotification({ text: "✅ Prodotto salvato!", type: "ok" });
-    setTimeout(() => setNotification(null), 3000);
-  }
-
-  function deleteProduct(id) {
-    setProducts(prev => prev.filter(p => p.id !== id));
-    setNotification({ text: "🗑️ Prodotto eliminato", type: "warn" });
-    setTimeout(() => setNotification(null), 3000);
-  }
-
-  function duplicateProduct(p) {
-    const dup = { ...p, id: uuid(), dataInserimento: today(), ultimaModifica: today() };
-    setProducts(prev => [...prev, dup]);
-    setNotification({ text: "📋 Prodotto duplicato", type: "ok" });
-    setTimeout(() => setNotification(null), 3000);
-  }
-
-  const navItems = [
-    { id: "dashboard", label: "Home", icon: <Icons.Home /> },
-    { id: "products", label: "Prodotti", icon: <Icons.List /> },
-    { id: "reports", label: "Report", icon: <Icons.Chart /> },
-    { id: "settings", label: "Impostazioni", icon: <Icons.Settings /> },
-  ];
-
-  return (
-    <div style={{ background: COLORS.bg, minHeight: "100vh", color: COLORS.text, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ background: COLORS.surface, borderBottom: `1px solid ${COLORS.border}`, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ background: COLORS.accent, borderRadius: 10, padding: "6px 10px", fontSize: 18 }}>🏪</div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: COLORS.text }}>{shopName}</div>
-            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: 1 }}>GESTIONE SCADENZE</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {products.filter(p => daysLeft(p.dataScadenza) < 0).length > 0 && (
-            <div style={{ background: COLORS.red + "22", border: `1px solid ${COLORS.red}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, color: COLORS.red, fontWeight: 700 }}>
-              {products.filter(p => daysLeft(p.dataScadenza) < 0).length} scaduti
-            </div>
-          )}
-          <Btn onClick={() => { setEditProduct(null); setShowForm(true); }} icon={<Icons.Plus />} size="sm">Nuovo</Btn>
-        </div>
-      </div>
-
-      {/* Toast */}
-      {notification && (
-        <div style={{
-          position: "fixed", top: 72, right: 16, zIndex: 2000,
-          background: notification.type === "ok" ? COLORS.green + "22" : COLORS.yellow + "22",
-          border: `1px solid ${notification.type === "ok" ? COLORS.green : COLORS.yellow}`,
-          borderRadius: 10, padding: "10px 18px", color: COLORS.text, fontSize: 14, fontWeight: 600,
-          animation: "fadeIn .3s",
-        }}>
-          {notification.text}
-        </div>
-      )}
-
-      {/* Content */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px" }}>
-        {page === "dashboard" && <Dashboard products={products} onAdd={() => { setEditProduct(null); setShowForm(true); }} onDetail={setDetailProduct} />}
-        {page === "products" && <ProductList products={products} categories={categories} onAdd={() => { setEditProduct(null); setShowForm(true); }} onEdit={p => { setEditProduct(p); setShowForm(true); }} onDelete={deleteProduct} onDetail={setDetailProduct} onDuplicate={duplicateProduct} />}
-        {page === "reports" && <Reports products={products} />}
-        {page === "settings" && <Settings alerts={alerts} setAlerts={setAlerts} categories={categories} setCategories={setCategories} shopName={shopName} setShopName={setShopName} />}
-      </div>
-
-      {/* Bottom Nav */}
-      <div style={{
-        position: "fixed", bottom: 0, left: 0, right: 0,
-        background: COLORS.surface, borderTop: `1px solid ${COLORS.border}`,
-        display: "flex", justifyContent: "space-around", padding: "8px 0 12px", zIndex: 100,
-      }}>
-        {navItems.map(n => {
-          const active = page === n.id;
-          return (
-            <button key={n.id} onClick={() => setPage(n.id)} style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-              background: "none", border: "none", cursor: "pointer",
-              color: active ? COLORS.accent : COLORS.muted, padding: "4px 20px",
-              transition: "color .2s",
-            }}>
-              <div style={{ transform: active ? "scale(1.15)" : "scale(1)", transition: "transform .2s" }}>{n.icon}</div>
-              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{n.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Modals */}
-      {showForm && (
-        <Modal title={editProduct ? "Modifica Prodotto" : "Nuovo Prodotto"} onClose={() => { setShowForm(false); setEditProduct(null); }} wide>
-          <ProductForm initial={editProduct} categories={categories} onSave={saveProduct} onClose={() => { setShowForm(false); setEditProduct(null); }} />
-        </Modal>
-      )}
-      {detailProduct && (
-        <Modal title="Dettaglio Prodotto" onClose={() => setDetailProduct(null)}>
-          <ProductDetail product={detailProduct} onEdit={p => { setEditProduct(p); setShowForm(true); }} onDelete={deleteProduct} onDuplicate={duplicateProduct} onClose={() => setDetailProduct(null)} />
-        </Modal>
-      )}
-
-      <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #2e3350; border-radius: 3px; }
-        input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); }
-        select option { background: #1a1d27; }
-      `}</style>
-    </div>
-  );
+function onSettoreChange() {
+  const s = document.getElementById('f-settore')?.value;
+  const fams = s ? (categories.famiglie[s]||[]) : [];
+  const sel = document.getElementById('f-famiglia');
+  if(sel){sel.innerHTML='<option value="">— Seleziona —</option>'+fams.map(f=>`<option>${f}</option>`).join('');}
+  const sel2 = document.getElementById('f-sotto');
+  if(sel2){sel2.innerHTML='<option value="">— Seleziona —</option>';}
 }
+function onFamigliaChange() {
+  const f = document.getElementById('f-famiglia')?.value;
+  const subs = f ? (categories.sottofamiglie[f]||[]) : [];
+  const sel = document.getElementById('f-sotto');
+  if(sel){sel.innerHTML='<option value="">— Seleziona —</option>'+subs.map(s=>`<option>${s}</option>`).join('');}
+}
+
+function saveForm(id) {
+  const nome = document.getElementById('f-nome')?.value?.trim();
+  const scad = document.getElementById('f-dscad')?.value;
+  if(!nome){showToast('⚠️ Inserisci il nome prodotto!');return;}
+  if(!scad){showToast('⚠️ Inserisci la data di scadenza!');return;}
+
+  const p = {
+    id, nomeProdotto:nome, codiceABarre:document.getElementById('f-barcode')?.value||'',
+    qrCode:document.getElementById('f-qr')?.value||'', codiceSKU:document.getElementById('f-sku')?.value||'',
+    descrizione:document.getElementById('f-desc')?.value||'', settore:document.getElementById('f-settore')?.value||'',
+    famiglia:document.getElementById('f-famiglia')?.value||'', sottofamiglia:document.getElementById('f-sotto')?.value||'',
+    dataProduzione:document.getElementById('f-dprod')?.value||'', dataScadenza:scad,
+    dataApertura:document.getElementById('f-dapert')?.value||'', giorniVitaDopoApertura:document.getElementById('f-vita')?.value||'',
+    fornitore:document.getElementById('f-forn')?.value||'', numeroFattura:document.getElementById('f-fatt')?.value||'',
+    dataFattura:document.getElementById('f-dfatt')?.value||'', numeroLotto:document.getElementById('f-lotto')?.value||'',
+    quantitaRicevuta:document.getElementById('f-qtar')?.value||'', unitaMisura:document.getElementById('f-um')?.value||'pz',
+    prezzoUnitario:document.getElementById('f-prezzo')?.value||'', posizioneInterna:document.getElementById('f-pos')?.value||'',
+    quantitaAttuale:document.getElementById('f-qtaa')?.value||'', quantitaMinima:document.getElementById('f-qtam')?.value||'',
+    note:document.getElementById('f-note')?.value||'', ultimaModifica:todayStr(),
+    dataInserimento: (editingId ? (products.find(x=>x.id===id)||{}).dataInserimento : null) || todayStr()
+  };
+
+  const idx = products.findIndex(x=>x.id===id);
+  if(idx>=0) products[idx]=p; else products.push(p);
+  save(); closeModal('form-overlay'); renderPage(currentPage); updateHeaderBadge();
+  showToast('✅ Prodotto salvato!');
+}
+
+function duplicateFromForm() {
+  const id = document.getElementById('f-barcode')?.closest('.modal-overlay')?.querySelector('[onclick*="saveForm"]')?.getAttribute('onclick')?.match(/'(.+)'/)?.[1];
+  closeModal('form-overlay');
+  if(id){const p=products.find(x=>x.id===id);if(p)duplicateProduct(p);}
+}
+
+// ═══════════════════════════════════════════════════════
+// DETAIL MODAL
+// ═══════════════════════════════════════════════════════
+function openDetail(id) {
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  const d = daysLeft(p.dataScadenza);
+  const rows = [
+    ['Nome',p.nomeProdotto],['Codice a Barre',p.codiceABarre],['QR Code',p.qrCode],
+    ['SKU',p.codiceSKU],['Lotto',p.numeroLotto],['Settore',p.settore],
+    ['Famiglia',p.famiglia],['Sottofamiglia',p.sottofamiglia],
+    ['Data Produzione',fmtDate(p.dataProduzione)],['Data Scadenza',fmtDate(p.dataScadenza)],
+    ['Data Apertura',fmtDate(p.dataApertura)],['Giorni vita dopo apertura',p.giorniVitaDopoApertura],
+    ['Fornitore',p.fornitore],['N° Fattura',p.numeroFattura],['Data Fattura',fmtDate(p.dataFattura)],
+    ['Quantità Ricevuta',p.quantitaRicevuta?`${p.quantitaRicevuta} ${p.unitaMisura}`:''],
+    ['Quantità Attuale',p.quantitaAttuale],['Quantità Minima',p.quantitaMinima],
+    ['Prezzo Unitario',p.prezzoUnitario?`€ ${p.prezzoUnitario}`:''],
+    ['Posizione',p.posizioneInterna],['Note',p.note],
+    ['Inserimento',fmtDate(p.dataInserimento)],['Ultima Modifica',fmtDate(p.ultimaModifica)]
+  ].filter(([,v])=>v);
+
+  const mc = document.getElementById('modal-container');
+  mc.innerHTML += `
+    <div class="modal-overlay center" id="detail-overlay" onclick="if(event.target===this)closeModal('detail-overlay')">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div class="modal-title">${p.nomeProdotto}</div>
+          <button class="btn btn-ghost btn-icon" onclick="closeModal('detail-overlay')">✕</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          ${badge(d)}
+          <span style="font-size:12px;color:var(--muted)">Scadenza: ${fmtDate(p.dataScadenza)}</span>
+        </div>
+        ${rows.map(([l,v])=>`<div class="detail-row"><div class="detail-lbl">${l}</div><div class="detail-val">${v}</div></div>`).join('')}
+        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="duplicateProduct(products.find(x=>x.id==='${id}'));closeModal('detail-overlay')">📋 Duplica</button>
+          <button class="btn btn-secondary btn-sm" onclick="closeModal('detail-overlay');openForm('${id}')">✏️ Modifica</button>
+          <button class="btn btn-danger btn-sm" onclick="if(confirm('Eliminare?')){deleteProduct('${id}');closeModal('detail-overlay')}">🗑️ Elimina</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal(id) { const el=document.getElementById(id); if(el) el.remove(); }
+
+// ═══════════════════════════════════════════════════════
+// BARCODE SCANNER (simulato - in produzione usa html5-qrcode)
+// ═══════════════════════════════════════════════════════
+function scanCode(targetId) {
+  if('BarcodeDetector' in window) {
+    // Usa BarcodeDetector API nativa se disponibile
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(stream=>{
+      video.srcObject=stream; video.play();
+      const detector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','qr_code','code_128']});
+      const interval = setInterval(async()=>{
+        try {
+          canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+          canvas.getContext('2d').drawImage(video,0,0);
+          const codes = await detector.detect(canvas);
+          if(codes.length>0){
+            clearInterval(interval); stream.getTracks().forEach(t=>t.stop());
+            const el=document.getElementById(targetId); if(el){el.value=codes[0].rawValue;}
+            showToast('✅ Codice rilevato: '+codes[0].rawValue);
+          }
+        }catch(e){}
+      },300);
+      setTimeout(()=>{clearInterval(interval);stream.getTracks().forEach(t=>t.stop());},15000);
+    }).catch(()=>manualCode(targetId));
+  } else {
+    manualCode(targetId);
+  }
+}
+function manualCode(targetId) {
+  const code = prompt('📷 Fotocamera non disponibile.\nInserisci il codice manualmente:');
+  if(code){const el=document.getElementById(targetId);if(el)el.value=code.trim();}
+}
+
+// ═══════════════════════════════════════════════════════
+// BACKUP
+// ═══════════════════════════════════════════════════════
+function exportBackup() {
+  const data = {products,categories,alerts,shopName};
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`backup-scadenze-${todayStr()}.json`; a.click();
+}
+function importBackup(input) {
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try {
+      const d=JSON.parse(ev.target.result);
+      if(d.products){products=d.products;save();}
+      if(d.categories){categories=d.categories;saveCategories();}
+      if(d.alerts){alerts=d.alerts;saveAlerts();}
+      if(d.shopName){shopName=d.shopName;saveShop();}
+      showToast('✅ Backup ripristinato!');
+      renderPage(currentPage); updateHeaderBadge();
+    }catch{showToast('❌ File non valido');}
+  };
+  r.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════
+// ALERT CHECKER (ogni minuto)
+// ═══════════════════════════════════════════════════════
+setInterval(()=>{
+  const now=new Date();
+  const hhmm=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  alerts.filter(a=>a.attivo&&a.ora===hhmm).forEach(a=>{
+    const urgent=products.filter(p=>daysLeft(p.dataScadenza)===a.giorni);
+    if(urgent.length>0){
+      playAlert();
+      showToast(`⏰ ${a.label}: ${urgent.length} prodotto/i!`);
+      if('Notification' in window && Notification.permission==='granted'){
+        new Notification('🏪 Deli Manager', {body:`${a.label}: ${urgent.length} prodotto/i in scadenza!`,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏪</text></svg>'});
+      }
+    }
+  });
+},60000);
+
+// ═══════════════════════════════════════════════════════
+// PWA INSTALL
+// ═══════════════════════════════════════════════════════
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredPrompt=e;
+  document.getElementById('install-banner').style.display='block';
+});
+function installApp() {
+  if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-banner').style.display='none';});}
+  else{alert('Per installare:\n1. Apri in Chrome\n2. Menu ⋮ → "Aggiungi a schermata Home"');}
+}
+
+// ═══════════════════════════════════════════════════════
+// SERVICE WORKER (inline via Blob)
+// ═══════════════════════════════════════════════════════
+if('serviceWorker' in navigator) {
+  const sw=`
+    const CACHE='scadenze-deli-v1';
+    const ASSETS=['/'];
+    self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
+    self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/')))));
+  `;
+  const blob=new Blob([sw],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+// PWA Manifest
+const manifest={name:'Scadenze Deli',short_name:'Scadenze',start_url:'.',display:'standalone',background_color:'#0f1117',theme_color:'#f97316',description:'Gestione scadenze prodotti retail',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="32" fill="%23f97316"/><text x="96" y="130" font-size="100" text-anchor="middle">🏪</text></svg>',sizes:'192x192',type:'image/svg+xml'},{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="%23f97316"/><text x="256" y="350" font-size="270" text-anchor="middle">🏪</text></svg>',sizes:'512x512',type:'image/svg+xml'}]};
+const mblob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+document.getElementById('manifest-placeholder').href=URL.createObjectURL(mblob);
+
+// Notifications permission
+if('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+navigate('dashboard');
+</script>
+</body>
+</html>
